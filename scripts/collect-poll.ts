@@ -7,13 +7,15 @@
 import { getPollVoters } from "../src/discord.js";
 import {
   findActivityLogByDate,
-  getActiveMembers,
+  getMembers,
   upsertRawLog,
   markActivityLogCollected,
   type RawLogRow,
   type AttendanceStatus,
 } from "../src/sheets.js";
 import { todayJST, nowJSTISO } from "../src/date.js";
+import { getAllRawLog, rewriteDashboard } from "../src/sheets.js";
+import { buildDashboard } from "../src/dashboard.js";
 
 // Poll の選択肢ID(workflow A での定義順)
 // answers配列の順序通りに 1, 2 が割り振られる
@@ -61,9 +63,9 @@ async function main() {
     `投票結果: 出席=${attendResult.voters.length}件, 欠席=${absentResult.voters.length}件`,
   );
 
-  // [3] active メンバーを取得
-  const members = await getActiveMembers();
-  console.log(`active メンバー数: ${members.length}`);
+  // [3] members シートからメンバー一覧を取得
+  const members = await getMembers();
+  console.log(`メンバー数: ${members.length}`);
 
   // [4] 投票者を Discord ID でマップ化(後で照合に使う)
   const attendMap = new Map(attendResult.voters.map((v) => [v.id, v]));
@@ -121,6 +123,15 @@ async function main() {
   // [7] activity_log を collected に更新
   await markActivityLogCollected({ date: today, collectedAt: recordedAt });
   console.log(`activity_log を collected に更新`);
+
+  // [8] dashboard シートを更新
+  // 設計意図: raw_log の最新状態で dashboard を再生成する
+  console.log("dashboard を更新中...");
+  const allRawLog = await getAllRawLog();
+  const allMembers = await getMembers();
+  const dashboardData = buildDashboard(allRawLog, allMembers);
+  await rewriteDashboard(dashboardData);
+  console.log(`dashboard 更新完了: ${dashboardData.length - 1}行 × ${dashboardData[0]?.length  ?? 0}列`);
 }
 
 main().catch((err) => {

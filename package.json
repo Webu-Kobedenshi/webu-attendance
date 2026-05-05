@@ -9,6 +9,7 @@
   "scripts": {
     "post-poll": "node --env-file=.env --import tsx scripts/post-poll.ts",
     "collect-poll": "node --env-file=.env --import tsx scripts/collect-poll.ts",
+    "sync-members": "node --env-file=.env --import tsx scripts/sync-members.ts",
     "test-sheets": "node --env-file=.env --import tsx scripts/test-sheets.ts",
     "test-discord": "node --env-file=.env --import tsx scripts/test-discord.ts"
   },

@@ -88,24 +88,26 @@ export async function appendActivityLog(params: {
 export type Member = {
   discordId: string;
   displayName: string;
-  team: string;
+  roles: string[];   // シート上はカンマ区切り文字列、コード内では配列
   joinedAt: string;
-  status: "active" | "inactive";
 };
 
+const MEMBERS_HEADER = ["discordId", "displayName", "roles", "joinedAt"];
+
 /**
- * members シートから active メンバーのみを取得
+ * members シートから全メンバーを取得
  *
  * 設計意図:
- * - シート全体を読んで、コード側で active フィルタする
+ * - members シートに居る = 出欠集計の対象、というシンプルなルール
+ * - 「Discord 側の状態が真実」前提で、Sheet 側で active/inactive を二重管理しない
  * - We部の規模では数十行なのでパフォーマンス問題なし
  */
-export async function getActiveMembers(): Promise<Member[]> {
+export async function getMembers(): Promise<Member[]> {
   const sheets = getSheetsClient();
 
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: config.google.sheetId,
-    range: "members!A2:E",
+    range: "members!A2:D",
   });
 
   const rows = res.data.values ?? [];
@@ -113,11 +115,52 @@ export async function getActiveMembers(): Promise<Member[]> {
     .map((row) => ({
       discordId: row[0] ?? "",
       displayName: row[1] ?? "",
-      team: row[2] ?? "",
+      roles: parseRoles(row[2] ?? ""),
       joinedAt: row[3] ?? "",
-      status: (row[4] ?? "inactive") as Member["status"],
     }))
-    .filter((m) => m.status === "active" && m.discordId !== "");
+    .filter((m) => m.discordId !== "");
+}
+
+function parseRoles(s: string): string[] {
+  return s
+    .split(",")
+    .map((r) => r.trim())
+    .filter(Boolean);
+}
+
+/**
+ * members シートを Discord から取得した内容で全上書きする
+ *
+ * 設計意図:
+ * - 「Discord 側の状態が真実」前提なので、merge ではなく全消し→全書き
+ * - 旧スキーマ(5列: 末尾に status 列があった)を残さないため A:E をクリア
+ */
+export async function overwriteMembers(members: Member[]): Promise<void> {
+  const sheets = getSheetsClient();
+
+  // [1] 既存シートを全消し(旧スキーマの status 列も含めて A:E)
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: config.google.sheetId,
+    range: "members!A:E",
+  });
+
+  // [2] ヘッダー + データを書き込む
+  const values: string[][] = [
+    MEMBERS_HEADER,
+    ...members.map((m) => [
+      m.discordId,
+      m.displayName,
+      m.roles.join(","),
+      m.joinedAt,
+    ]),
+  ];
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: config.google.sheetId,
+    range: "members!A1",
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values },
+  });
 }
 
 export type AttendanceStatus = "出席" | "欠席" | "未回答";
@@ -265,5 +308,61 @@ export async function markActivityLogCollected(params: {
         },
       ],
     },
+  });
+}
+
+/**
+ * raw_log を全件取得する（dashboard 生成用）
+ *
+ * 設計意図:
+ * - 既存の getRawLogIndex は「行番号マップ」だけを返すが、
+ *   dashboard 生成では中身も必要なので別関数として作る
+ * - 関心の分離（UPSERT 用 vs 集計用）
+ */
+export async function getAllRawLog(): Promise<RawLogRow[]> {
+  const sheets = getSheetsClient();
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: config.google.sheetId,
+    range: "raw_log!A2:F",
+  });
+
+  const rows = res.data.values ?? [];
+  return rows.map((row) => ({
+    date: row[0] ?? "",
+    discordId: row[1] ?? "",
+    globalName: row[2] ?? "",
+    username: row[3] ?? "",
+    attendance: (row[4] ?? "未回答") as AttendanceStatus,
+    recordedAt: row[5] ?? "",
+  }));
+}
+
+/**
+ * dashboard シートを全消しして書き直す
+ *
+ * 設計意図:
+ * - 「全消し→全書き直し」方式で実装をシンプルに保つ
+ * - clear と update を1回ずつの API 呼び出しで完結
+ * - values が空の値（メンバー未参加など）は空文字で埋める
+ */
+export async function rewriteDashboard(values: string[][]): Promise<void> {
+  const sheets = getSheetsClient();
+
+  // [1] 既存の dashboard を全消し
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: config.google.sheetId,
+    range: "dashboard",
+  });
+
+  // [2] 新しいデータを書き込む
+  // values が空の場合は何もしない（dashboard が空の状態で残る）
+  if (values.length === 0) return;
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: config.google.sheetId,
+    range: "dashboard!A1",
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values },
   });
 }

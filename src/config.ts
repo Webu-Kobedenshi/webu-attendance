@@ -18,6 +18,11 @@ export const config = {
   discord: {
     botToken: requireEnv("DISCORD_BOT_TOKEN"),
     channelId: requireEnv("DISCORD_CHANNEL_ID"),
+    // guildId は sync-members でのみ必要なので、起動時には検証しない
+    // 使う側で requireGuildId() を呼ぶ
+    get guildId(): string {
+      return requireEnv("DISCORD_GUILD_ID");
+    },
   },
   google: {
     sheetId: requireEnv("GOOGLE_SHEET_ID"),

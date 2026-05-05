@@ -2,13 +2,6 @@
 
 We部の活動日における出欠を、Discord Poll とスプレッドシートで自動集計するシステム。
 
-## 仕組み
-
-毎週木曜日に GitHub Actions が以下を実行する:
-
-- **15:30 JST**: Discord 出欠チャンネルに Poll を投稿(workflow A)
-- **19:35 JST**: Poll の結果を取得して `WeBu_Attendance` スプレッドシートに記録(workflow B)
-
 ## ローカル開発
 
 ### 必要な環境変数

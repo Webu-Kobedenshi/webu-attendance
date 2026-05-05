@@ -83,4 +83,187 @@ export async function appendActivityLog(params: {
       ],
     },
   });
-} 
+}
+
+export type Member = {
+  discordId: string;
+  displayName: string;
+  team: string;
+  joinedAt: string;
+  status: "active" | "inactive";
+};
+
+/**
+ * members シートから active メンバーのみを取得
+ *
+ * 設計意図:
+ * - シート全体を読んで、コード側で active フィルタする
+ * - We部の規模では数十行なのでパフォーマンス問題なし
+ */
+export async function getActiveMembers(): Promise<Member[]> {
+  const sheets = getSheetsClient();
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: config.google.sheetId,
+    range: "members!A2:E",
+  });
+
+  const rows = res.data.values ?? [];
+  return rows
+    .map((row) => ({
+      discordId: row[0] ?? "",
+      displayName: row[1] ?? "",
+      team: row[2] ?? "",
+      joinedAt: row[3] ?? "",
+      status: (row[4] ?? "inactive") as Member["status"],
+    }))
+    .filter((m) => m.status === "active" && m.discordId !== "");
+}
+
+export type AttendanceStatus = "出席" | "欠席" | "未回答";
+
+export type RawLogRow = {
+  date: string;
+  discordId: string;
+  globalName: string;
+  username: string;
+  attendance: AttendanceStatus;
+  recordedAt: string;
+};
+
+/**
+ * raw_log を全件読んで、(日付, Discord ID) → 行番号のマップを返す
+ *
+ * 設計意図:
+ * - UPSERT のために、既存行の場所を特定する必要がある
+ * - 行番号は 1-indexed で、シート上の実行番号と一致させる
+ *   （ヘッダーが1行目、データは2行目から）
+ */
+async function getRawLogIndex(): Promise<Map<string, number>> {
+  const sheets = getSheetsClient();
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: config.google.sheetId,
+    range: "raw_log!A2:F",
+  });
+
+  const rows = res.data.values ?? [];
+  const index = new Map<string, number>();
+
+  rows.forEach((row, i) => {
+    const date = row[0] ?? "";
+    const discordId = row[1] ?? "";
+    if (date && discordId) {
+      // i=0 はシート上の2行目なので +2
+      index.set(`${date}__${discordId}`, i + 2);
+    }
+  });
+
+  return index;
+}
+
+/**
+ * raw_log に複数レコードを UPSERT する
+ *
+ * 設計意図:
+ * - 既存レコード(同日同メンバー)は更新、新規は追加
+ * - batchUpdate で API 呼び出しを最小化
+ * - 冪等性: 何度実行しても同じ結果になる
+ */
+export async function upsertRawLog(rows: RawLogRow[]): Promise<{
+  updated: number;
+  appended: number;
+}> {
+  const sheets = getSheetsClient();
+  const index = await getRawLogIndex();
+
+  const updates: { range: string; values: string[][] }[] = [];
+  const appends: string[][] = [];
+
+  for (const row of rows) {
+    const key = `${row.date}__${row.discordId}`;
+    const values = [
+      row.date,
+      row.discordId,
+      row.globalName,
+      row.username,
+      row.attendance,
+      row.recordedAt,
+    ];
+
+    if (index.has(key)) {
+      const rowNum = index.get(key)!;
+      updates.push({
+        range: `raw_log!A${rowNum}:F${rowNum}`,
+        values: [values],
+      });
+    } else {
+      appends.push(values);
+    }
+  }
+
+  // 既存レコードは batchUpdate で一括更新
+  if (updates.length > 0) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: config.google.sheetId,
+      requestBody: {
+        valueInputOption: "USER_ENTERED",
+        data: updates,
+      },
+    });
+  }
+
+  // 新規レコードは append で一括追加
+  if (appends.length > 0) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: config.google.sheetId,
+      range: "raw_log!A:F",
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: appends },
+    });
+  }
+
+  return { updated: updates.length, appended: appends.length };
+}
+
+/**
+ * activity_log の status を "collected" に更新し、collectedAt を埋める
+ */
+export async function markActivityLogCollected(params: {
+  date: string;
+  collectedAt: string;
+}): Promise<void> {
+  const sheets = getSheetsClient();
+
+  // 全件読んで対象行を特定
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: config.google.sheetId,
+    range: "activity_log!A2:E",
+  });
+
+  const rows = res.data.values ?? [];
+  const targetIndex = rows.findIndex((row) => row[0] === params.date);
+  if (targetIndex === -1) {
+    throw new Error(`activity_log に ${params.date} のレコードがありません`);
+  }
+
+  const rowNum = targetIndex + 2; // ヘッダーぶん +2
+
+  // C列(status)とE列(collectedAt)だけ更新
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: config.google.sheetId,
+    requestBody: {
+      valueInputOption: "USER_ENTERED",
+      data: [
+        {
+          range: `activity_log!C${rowNum}`,
+          values: [["collected"]],
+        },
+        {
+          range: `activity_log!E${rowNum}`,
+          values: [[params.collectedAt]],
+        },
+      ],
+    },
+  });
+}

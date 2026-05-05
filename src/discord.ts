@@ -34,7 +34,7 @@ export async function postAttendancePoll(question: string): Promise<string> {
         { poll_media: { text: "出席 ✅" } },
         { poll_media: { text: "欠席 ❌" } },
       ],
-      duration: 4, // 単位は時間
+      duration: 8, // 単位は時間
       allow_multiselect: false,
       layout_type: 1, // DEFAULT
     },

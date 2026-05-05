@@ -24,7 +24,7 @@ async function main() {
   }
 
   // Poll を投稿
-  const question = `【${today}】本日の出欠を回答してください（19:00締切）`;
+  const question = `【${today}】本日の出欠を回答してください`;
   const messageId = await postAttendancePoll(question);
   console.log(`Poll 投稿成功: message_id=${messageId}`);
 

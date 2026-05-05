@@ -8,6 +8,19 @@ import type { Member, RawLogRow } from "./sheets.js";
 const LEGEND = "○=出席 ×=欠席 △=未回答";
 
 /**
+ * メンバーの所属チームをソートキーとして取り出す
+ *
+ * 設計意図:
+ * - 「team1/team2/team3」という運用ルールに合わせて /^team/i で拾う
+ * - 該当ロールがない人は U+FFFF を返して末尾に集める
+ *   (U+FFFF は Unicode の通常文字より大きいので必ず後ろにくる)
+ * - 命名規則を変える時はここの正規表現だけ修正すればよい
+ */
+function teamKey(roles: string[]): string {
+  return roles.find((r) => /^team/i.test(r)) ?? "￿";
+}
+
+/**
  * 出欠ステータスを記号に変換
  */
 function attendanceSymbol(status: string | undefined): string {
@@ -69,13 +82,18 @@ export function buildDashboard(
     }
   }
 
-  // [4] メンバーをソート（ロール → 表示名）
-  // ロールは複数持つので join した文字列で比較。team1 < team2 のように期待通り並ぶ
+  // [4] メンバーをソート（チーム → 表示名）
+  //
+  // チームの判定: ロール名のうち /^team/i にマッチする最初のものを「team キー」とする
+  // - team を持たない人(管理だけ、OB だけ、ロール未付与)は team キー = "￿" で末尾に集める
+  // - team1 < team2 < team3 のように Unicode 順で期待通り並ぶ
+  // - ロール命名規則を変える時は teamKey() の正規表現だけ書き換えれば済む
+  //
   // 表示名は raw_log の最新があればそれを使い、なければ members の displayName
   const sortedMembers = [...members].sort((a, b) => {
-    const rolesA = a.roles.join(",");
-    const rolesB = b.roles.join(",");
-    if (rolesA !== rolesB) return rolesA.localeCompare(rolesB);
+    const teamA = teamKey(a.roles);
+    const teamB = teamKey(b.roles);
+    if (teamA !== teamB) return teamA.localeCompare(teamB);
     const nameA = latestNameMap.get(a.discordId)?.name ?? a.displayName;
     const nameB = latestNameMap.get(b.discordId)?.name ?? b.displayName;
     return nameA.localeCompare(nameB, "ja");

@@ -181,9 +181,12 @@ export async function getGuildMembers(): Promise<GuildMember[]> {
 
       // ロール ID を名前に解決(@everyone はそもそも roles 配列に含まれないが、
       // 念のため id === guildId のものは除外する)
+      // ロールはここでソートしておく: Discord API の返す配列順は不定なので、
+      // ダッシュボード表示や sort key で同じ並びになるよう正規化する
       const roleNames = m.roles
         .map((id) => roleNameById.get(id))
-        .filter((name): name is string => !!name && name !== "@everyone");
+        .filter((name): name is string => !!name && name !== "@everyone")
+        .sort((a, b) => a.localeCompare(b, "ja"));
 
       result.push({
         discordId: m.user.id,

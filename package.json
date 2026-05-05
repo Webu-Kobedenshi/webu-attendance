@@ -7,7 +7,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "post-poll": "node --env-file=.env --import tsx scripts/post-poll.ts",
+    "collect-poll": "node --env-file=.env --import tsx scripts/collect-poll.ts",
+    "test-sheets": "node --env-file=.env --import tsx scripts/test-sheets.ts",
+    "test-discord": "node --env-file=.env --import tsx scripts/test-discord.ts"
   },
   "repository": {
     "type": "git",

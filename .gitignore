@@ -1,4 +1,18 @@
+# 依存
 node_modules/
-secrets/
+dist/
+
+# 環境変数・シークレット(絶対 push 禁止)
 .env
-dist
+.env.local
+secrets/
+*-sa-key.json
+
+# OS / エディタ
+.DS_Store
+.vscode/
+.idea/
+
+# ログ
+*.log
+npm-debug.log*

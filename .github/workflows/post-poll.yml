@@ -1,0 +1,39 @@
+# 設計意図:
+# - 毎週木曜 09:00 JST = 木曜 00:00 UTC に Poll 投稿
+# - workflow_dispatch で手動実行も可能（テスト・障害時の再実行用）
+# - キャッシュで依存解決を高速化
+# - 失敗したら GitHub Actions の通知でわかる前提（追加通知は当面なし）
+
+name: Post Attendance Poll
+
+on:
+  schedule:
+    # cron は UTC なので JST 09:00 = UTC 00:00
+    # 木曜日 = 4
+    - cron: "0 0 * * 4"
+  workflow_dispatch: # 手動実行を有効化
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5 # ハングアップ防止
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm" # package-lock.json をキーに依存をキャッシュ
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run post-poll script
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID: ${{ vars.DISCORD_CHANNEL_ID }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SA_KEY_JSON: ${{ secrets.GOOGLE_SA_KEY_JSON }}
+        run: node --import tsx scripts/post-poll.ts

@@ -1,0 +1,37 @@
+# 設計意図:
+# - 毎週木曜 17:05 JST = 木曜 08:05 UTC に結果集計
+# - Poll 締切（17:00）の5分後に集計実行
+# - 構成は post-poll.yml とほぼ同じ
+# - 集計スクリプトを呼ぶ点だけ異なる
+
+name: Collect Attendance Poll
+
+on:
+  schedule:
+    - cron: "5 8 * * 4"
+  workflow_dispatch:
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run collect-poll script
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID: ${{ vars.DISCORD_CHANNEL_ID }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_SA_KEY_JSON: ${{ secrets.GOOGLE_SA_KEY_JSON }}
+        run: node --import tsx scripts/collect-poll.ts

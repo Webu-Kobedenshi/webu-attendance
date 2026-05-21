@@ -1,5 +1,7 @@
 # 設計意図:
-# - 毎週木曜 08:43 JST = 水曜 23:43 UTC に Poll 投稿
+# - 本来の投稿希望時刻は木曜 08:43 JST
+# - GitHub Actions の schedule は常に約 2 時間遅延するため、
+#   発火指定を 2 時間前倒しして木曜 06:43 JST = 水曜 21:43 UTC を指定
 # - workflow_dispatch で手動実行も可能（テスト・障害時の再実行用）
 # - キャッシュで依存解決を高速化
 # - 失敗したら GitHub Actions の通知でわかる前提（追加通知は当面なし）
@@ -11,8 +13,9 @@ name: Post Attendance Poll
 
 on:
   schedule:
-    # cron は UTC。木曜 08:43 JST = 水曜 23:43 UTC（水曜 = 3）
-    - cron: "43 23 * * 3"
+    # cron は UTC。木曜 06:43 JST = 水曜 21:43 UTC（水曜 = 3）
+    # ※実発火は約 2 時間遅れて木曜 08:43 JST 前後になる想定
+    - cron: "43 21 * * 3"
   workflow_dispatch: # 手動実行を有効化
 
 jobs:

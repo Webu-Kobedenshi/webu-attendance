@@ -11,12 +11,12 @@ We部の活動日における出欠を、Discord Poll とスプレッドシー�
 ## 全体像
 
 ```
-木曜 09:00 JST  ─┐
+木曜 08:43 JST  ─┐
                  │ GitHub Actions (cron) が Discord に Poll を自動投稿
                  │   → 「【YYYY-MM-DD】本日の出欠を回答してください」
                  │   → 選択肢: 出席 / 欠席（8時間後に Discord 側で自動締切）
                  │
-木曜 17:05 JST  ─┤ GitHub Actions (cron) が Poll の投票結果を集計
+木曜 17:13 JST  ─┤ GitHub Actions (cron) が Poll の投票結果を集計
                  │   → Discord から投票者リストを取得
                  │   → members シートと突合し「出席 / 欠席 / 未回答」を判定
                  │   → raw_log に追記、dashboard を再生成
@@ -30,8 +30,12 @@ We部の活動日における出欠を、Discord Poll とスプレッドシー�
 ### 通常運用（毎週木曜）
 
 何もしなくてよい。GitHub Actions の cron が自動で動く。
-- `Post Attendance Poll`: 木曜 09:00 JST
-- `Collect Attendance Poll`: 木曜 17:05 JST（Poll 締切の5分後）
+- `Post Attendance Poll`: 木曜 08:43 JST
+- `Collect Attendance Poll`: 木曜 17:13 JST（Poll 締切の十数分後）
+
+> 時刻が「09:00」「17:05」のような綺麗な時刻ではなく半端なのは、GitHub Actions
+> の schedule が top of the hour 付近で大幅遅延する事象を回避するため。
+> 詳細は各 workflow ファイルのコメント参照。
 
 ### Discord サーバーのメンバーが変わったとき
 

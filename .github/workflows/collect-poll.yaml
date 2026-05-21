@@ -1,8 +1,8 @@
 # 設計意図:
-# - 毎週木曜 17:13 JST = 木曜 08:13 UTC に結果集計
-# - Poll 締切（17:00）の十数分後に集計実行（遅延を吸収）
-# - 構成は post-poll.yml とほぼ同じ
-# - 集計スクリプトを呼ぶ点だけ異なる
+# - 本来の集計希望時刻は木曜 17:13 JST（Poll 締切 17:00 の十数分後）
+# - GitHub Actions の schedule は常に約 2 時間遅延するため、
+#   発火指定を 2 時間前倒しして木曜 15:13 JST = 木曜 06:13 UTC を指定
+# - 構成は post-poll.yml とほぼ同じ。集計スクリプトを呼ぶ点だけ異なる
 # - cron の分は「00 分・05 分」など綺麗な時刻を避ける: GitHub Actions の
 #   schedule は top of the hour 付近に世界中の job が集中して大幅遅延する
 #   事象があるため、半端な分（:13）にオフセットして遅延を抑える
@@ -11,8 +11,9 @@ name: Collect Attendance Poll
 
 on:
   schedule:
-    # cron は UTC。木曜 17:13 JST = 木曜 08:13 UTC（木曜 = 4）
-    - cron: "13 8 * * 4"
+    # cron は UTC。木曜 15:13 JST = 木曜 06:13 UTC（木曜 = 4）
+    # ※実発火は約 2 時間遅れて木曜 17:13 JST 前後になる想定
+    - cron: "13 6 * * 4"
   workflow_dispatch:
 
 jobs:

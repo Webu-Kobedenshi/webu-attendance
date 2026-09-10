@@ -43,6 +43,10 @@ We部の活動日における出欠を、Discord Poll とスプレッドシー�
 
 12月17日より後は、新しい活動日を `src/activity-schedule.ts` に追加するまで自動実行されない。
 
+公開リポジトリの無活動による定期実行停止を防ぐため、確定済み活動期間中は
+`Keep Scheduled Workflows Active` が月1回だけ維持用コミットを作成する。
+この維持処理も12月17日より後は更新を行わない。
+
 > 時刻が「09:00」「17:05」のような綺麗な時刻ではなく半端なのは、GitHub Actions
 > の schedule が top of the hour 付近で大幅遅延する事象を回避するため。
 > 詳細は各 workflow ファイルのコメント参照。

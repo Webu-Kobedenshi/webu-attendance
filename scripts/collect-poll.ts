@@ -14,6 +14,7 @@ import {
   type AttendanceStatus,
 } from "../src/sheets.js";
 import { todayJST, nowJSTISO } from "../src/date.js";
+import { shouldRunForActivityDate } from "../src/activity-schedule.js";
 import { getAllRawLog, rewriteDashboard } from "../src/sheets.js";
 import { buildDashboard } from "../src/dashboard.js";
 
@@ -24,6 +25,12 @@ const ANSWER_ID_ABSENT = 2; // 欠席 ❌
 
 async function main() {
   const today = todayJST();
+
+  if (!shouldRunForActivityDate(today)) {
+    console.log(`[${today}] 活動日ではないため定期集計をスキップ`);
+    return;
+  }
+
   console.log(`[${today}] 結果集計処理を開始`);
 
   // [1] activity_log から今日のレコードを取得

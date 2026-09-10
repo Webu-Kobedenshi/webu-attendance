@@ -9,9 +9,16 @@ import {
   appendActivityLog,
 } from "../src/sheets.js";
 import { todayJST, nowJSTISO } from "../src/date.js";
+import { shouldRunForActivityDate } from "../src/activity-schedule.js";
 
 async function main() {
   const today = todayJST();
+
+  if (!shouldRunForActivityDate(today)) {
+    console.log(`[${today}] 活動日ではないため定期投稿をスキップ`);
+    return;
+  }
+
   console.log(`[${today}] Poll 投稿処理を開始`);
 
   // 冪等性チェック: 同日に既に投稿済みなら何もしない

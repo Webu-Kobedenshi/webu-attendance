@@ -163,7 +163,8 @@ export async function overwriteMembers(members: Member[]): Promise<void> {
   });
 }
 
-export type AttendanceStatus = "出席" | "欠席" | "未回答";
+// 「出席」は仕様変更前の raw_log を読み込むために残す。新規集計では使用しない。
+export type AttendanceStatus = "出席" | "遅刻" | "欠席" | "就活" | "未回答";
 
 export type RawLogRow = {
   date: string;

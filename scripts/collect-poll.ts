@@ -1,7 +1,7 @@
 // 設計意図:
 // - workflow B のエントリポイント
 // - 冪等性: status === "collected" なら再集計をスキップ（手動で強制再実行したい場合は status を posted に戻せばよい）
-// - active メンバー全員に対して 出席/欠席/未回答 を判定し、raw_log に UPSERT
+// - active メンバー全員に対して 遅刻/欠席/就活/未回答 を判定し、raw_log に UPSERT
 // - 100件超の投票があった場合は警告ログを出して人間に通知
 
 import { getPollVoters } from "../src/discord.js";
@@ -19,9 +19,10 @@ import { getAllRawLog, rewriteDashboard } from "../src/sheets.js";
 import { buildDashboard } from "../src/dashboard.js";
 
 // Poll の選択肢ID(workflow A での定義順)
-// answers配列の順序通りに 1, 2 が割り振られる
-const ANSWER_ID_ATTEND = 1; // 出席 ✅
+// answers配列の順序通りに 1, 2, 3 が割り振られる
+const ANSWER_ID_LATE = 1; // 遅刻 ⏰
 const ANSWER_ID_ABSENT = 2; // 欠席 ❌
+const ANSWER_ID_JOB_HUNTING = 3; // 就活 💼
 
 async function main() {
   const today = todayJST();
@@ -49,15 +50,16 @@ async function main() {
   console.log(`対象 Poll: message_id=${activity.messageId}`);
 
   // [2] Discord から投票者を取得
-  const [attendResult, absentResult] = await Promise.all([
-    getPollVoters(activity.messageId, ANSWER_ID_ATTEND),
+  const [lateResult, absentResult, jobHuntingResult] = await Promise.all([
+    getPollVoters(activity.messageId, ANSWER_ID_LATE),
     getPollVoters(activity.messageId, ANSWER_ID_ABSENT),
+    getPollVoters(activity.messageId, ANSWER_ID_JOB_HUNTING),
   ]);
 
   // 100件超チェック(要件通り、超えたら警告)
-  if (attendResult.reachedLimit) {
+  if (lateResult.reachedLimit) {
     console.warn(
-      `⚠️  「出席」投票が100件に達しています。実際にはそれ以上の投票がある可能性があります。`,
+      `⚠️  「遅刻」投票が100件に達しています。実際にはそれ以上の投票がある可能性があります。`,
     );
   }
   if (absentResult.reachedLimit) {
@@ -65,9 +67,14 @@ async function main() {
       `⚠️  「欠席」投票が100件に達しています。実際にはそれ以上の投票がある可能性があります。`,
     );
   }
+  if (jobHuntingResult.reachedLimit) {
+    console.warn(
+      `⚠️  「就活」投票が100件に達しています。実際にはそれ以上の投票がある可能性があります。`,
+    );
+  }
 
   console.log(
-    `投票結果: 出席=${attendResult.voters.length}件, 欠席=${absentResult.voters.length}件`,
+    `投票結果: 遅刻=${lateResult.voters.length}件, 欠席=${absentResult.voters.length}件, 就活=${jobHuntingResult.voters.length}件`,
   );
 
   // [3] members シートからメンバー一覧を取得
@@ -75,10 +82,11 @@ async function main() {
   console.log(`メンバー数: ${members.length}`);
 
   // [4] 投票者を Discord ID でマップ化(後で照合に使う)
-  const attendMap = new Map(attendResult.voters.map((v) => [v.id, v]));
+  const lateMap = new Map(lateResult.voters.map((v) => [v.id, v]));
   const absentMap = new Map(absentResult.voters.map((v) => [v.id, v]));
+  const jobHuntingMap = new Map(jobHuntingResult.voters.map((v) => [v.id, v]));
 
-  // [5] active メンバー × 投票者で照合し、3値に分類
+  // [5] active メンバー × 投票者で照合し、4値に分類
   const recordedAt = nowJSTISO();
   const rawLogRows: RawLogRow[] = [];
 
@@ -87,14 +95,19 @@ async function main() {
     let globalName = member.displayName; // フォールバック: members の表示名
     let username = "";
 
-    if (attendMap.has(member.discordId)) {
-      attendance = "出席";
-      const voter = attendMap.get(member.discordId)!;
+    if (lateMap.has(member.discordId)) {
+      attendance = "遅刻";
+      const voter = lateMap.get(member.discordId)!;
       globalName = voter.globalName;
       username = voter.username;
     } else if (absentMap.has(member.discordId)) {
       attendance = "欠席";
       const voter = absentMap.get(member.discordId)!;
+      globalName = voter.globalName;
+      username = voter.username;
+    } else if (jobHuntingMap.has(member.discordId)) {
+      attendance = "就活";
+      const voter = jobHuntingMap.get(member.discordId)!;
       globalName = voter.globalName;
       username = voter.username;
     } else {
@@ -115,8 +128,9 @@ async function main() {
 
   // 集計サマリーをログに出す(運用時のヘルスチェック用)
   const summary = {
-    出席: rawLogRows.filter((r) => r.attendance === "出席").length,
+    遅刻: rawLogRows.filter((r) => r.attendance === "遅刻").length,
     欠席: rawLogRows.filter((r) => r.attendance === "欠席").length,
+    就活: rawLogRows.filter((r) => r.attendance === "就活").length,
     未回答: rawLogRows.filter((r) => r.attendance === "未回答").length,
   };
   console.log(`集計サマリー: ${JSON.stringify(summary)}`);

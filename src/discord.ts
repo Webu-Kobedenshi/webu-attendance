@@ -20,7 +20,7 @@ export type PollAnswer = { answer_id: number; text: string };
  *
  * Poll の仕様:
  * - 質問: 「本日の出欠を回答してください」
- * - 選択肢: 出席 / 欠席（単一選択）
+ * - 選択肢: 遅刻 / 欠席 / 就活（単一選択）
  * - 期限: 4時間（要件通り。15:00 投稿 → 19:00 締切で 19:05 集計）
  *
  * @param question 質問文（日付などを含めるとログで識別しやすい）
@@ -31,8 +31,9 @@ export async function postAttendancePoll(question: string): Promise<string> {
     poll: {
       question: { text: question },
       answers: [
-        { poll_media: { text: "出席 ✅" } },
+        { poll_media: { text: "遅刻 ⏰" } },
         { poll_media: { text: "欠席 ❌" } },
+        { poll_media: { text: "就活 💼" } },
       ],
       duration: 8, // 単位は時間
       allow_multiselect: false,
@@ -74,7 +75,7 @@ export type PollVoter = {
  *   呼び出し側で警告を出す
  *
  * @param messageId Poll の message ID
- * @param answerId 選択肢の ID（1: 出席, 2: 欠席）
+ * @param answerId 選択肢の ID（1: 遅刻, 2: 欠席, 3: 就活）
  */
 export async function getPollVoters(
   messageId: string,

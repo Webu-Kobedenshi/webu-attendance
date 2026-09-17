@@ -5,7 +5,7 @@
 
 import type { Member, RawLogRow } from "./sheets.js";
 
-const LEGEND = "○=出席 ×=欠席 △=未回答";
+const LEGEND = "○=出席(過去分) 遅=遅刻 ×=欠席 就=就活 △=未回答";
 
 /**
  * メンバーの所属チームをソートキーとして取り出す
@@ -27,8 +27,12 @@ function attendanceSymbol(status: string | undefined): string {
   switch (status) {
     case "出席":
       return "○";
+    case "遅刻":
+      return "遅";
     case "欠席":
       return "×";
+    case "就活":
+      return "就";
     case "未回答":
       return "△";
     default:

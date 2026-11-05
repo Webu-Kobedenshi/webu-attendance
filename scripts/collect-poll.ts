@@ -92,34 +92,28 @@ async function main() {
 
   for (const member of members) {
     let attendance: AttendanceStatus;
-    let globalName = member.displayName; // フォールバック: members の表示名
     let username = "";
 
     if (lateMap.has(member.discordId)) {
       attendance = "遅刻";
-      const voter = lateMap.get(member.discordId)!;
-      globalName = voter.globalName;
-      username = voter.username;
+      username = lateMap.get(member.discordId)!.username;
     } else if (absentMap.has(member.discordId)) {
       attendance = "欠席";
-      const voter = absentMap.get(member.discordId)!;
-      globalName = voter.globalName;
-      username = voter.username;
+      username = absentMap.get(member.discordId)!.username;
     } else if (jobHuntingMap.has(member.discordId)) {
       attendance = "就活";
-      const voter = jobHuntingMap.get(member.discordId)!;
-      globalName = voter.globalName;
-      username = voter.username;
+      username = jobHuntingMap.get(member.discordId)!.username;
     } else {
       attendance = "未回答";
-      // 投票していない場合は Discord から取得した名前情報がないので
-      // members シートの表示名をそのまま使う(username は空文字)
+      // 投票していない場合は Discord から取得した情報がないので username は空文字
     }
 
     rawLogRows.push({
       date: today,
       discordId: member.discordId,
-      globalName,
+      // 投票 API はサーバーのニックネームを返さないため、投票の有無によらず
+      // members シートの表示名に揃える(投票した人だけ名前が変わるのを防ぐ)
+      globalName: member.displayName,
       username,
       attendance,
       recordedAt,
